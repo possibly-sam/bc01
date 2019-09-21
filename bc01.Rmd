@@ -1,0 +1,125 @@
+---
+title: "bc01"
+author: "Phillip Abbott"
+date: "September 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+
+library(tidyverse)
+
+library(odbc)
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+
+
+```
+
+
+
+```{sql connection=con,  output.var="x0"}
+
+SELECT "Brief_Summary" , uui01, uui02, "CIO_Evaluation_Color" from public.business_case_alpha WHERE year=16
+
+```
+
+```{r}
+x0$uui <- (x0$uui02 + x0$uui01*1000000000 )
+
+
+messowordz <- x0$Brief_Summary %>% map(~ stringi::stri_split_fixed(.," ")) %>% unlist()
+
+messowordz <- messowordz %>% stringi::stri_trans_tolower()
+mt0 <- messowordz %>% table() %>% sort(TRUE)
+
+
+
+mt0 <- mt0[mt0>1]
+mt0 <- mt0[9:length(mt0)]
+
+mt0 %>% head(99)
+
+
+x0 <- x0[, c(1, 4,5)]
+the_color <- rep(1, nrow(x0))
+the_color[ x0$CIO_Evaluation_Color=='Green' ] <- 3
+the_color[ x0$CIO_Evaluation_Color=='Red' ]   <- 2
+
+x0 <- x0 %>% cbind(the_color)
+x0 <- x0[,-2]
+
+```
+
+
+get incidence of each of these nice words, in the business case descriptions
+
+```{r}
+
+get_incidence <- function(the_col, the_word) {
+  grepl(the_word, the_col, fixed=TRUE)
+}
+
+
+m0 <- data.frame( x0$uui )
+
+for (it in names(mt1) ) m0 <- m0 %>% cbind(x0$Brief_Summary %>% get_incidence(it) )
+
+colnames(m0) <- c("uui", paste0("w_", names(mt1) ))
+
+p0 <- prcomp(m0[,-1])
+
+p0 %>% summary()
+
+```
+
+Get the projection of the original business case summaries back down into the principal components.
+
+```{r}
+
+project_onto_kth_component <- function(pcompmtx, domain, k) {
+
+   (domain %>% as.numeric()) %*% (pcompmtx$rotation[,k] %>% as.numeric())
+
+}
+
+project_all_onto_kth_component <- function( pcompmtx, domain, k) { 
+
+  1:nrow(domain) %>% map( ~ project_onto_kth_component( pcompmtx,  domain[.,-1], k )) %>% unlist()
+
+}
+
+
+x0 <- x0 %>% cbind( pcx1=p0 %>% project_all_onto_kth_component ( m0, 1) )
+x0 <- x0 %>% cbind( pcx2=p0 %>% project_all_onto_kth_component ( m0, 2) )
+# p0 %>% project_all_onto_kth_component ( m0, 1)
+
+```
+
+
+
+```{r}
+
+plot(pcx2~pcx1, col=the_color, data=x0)
+
+```
+
+
+```{r}
+
+
+qda0<-qda(x0[,4:5], x0$the_color)
+
+```
+
+
+
+
+
+

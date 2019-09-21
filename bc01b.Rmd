@@ -1,0 +1,367 @@
+---
+title: "bc01b"
+author: "Phillip Abbott"
+date: "September 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+
+library(tidyverse)
+
+
+
+library(tidytext)
+library(tm)
+library(e1071)
+library(odbc)
+
+library(NLP)
+# library(openNLP)
+
+library(odbc)
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+
+
+```
+
+
+
+```{sql connection=con,  output.var="business_cases_year_17"}
+
+SELECT "Brief_Summary" , 
+  uui01::bigint*1000000000+uui02 AS uui, 
+  
+  "CIO_Evaluation_Color" from public.business_case_alpha WHERE year=17
+
+```
+
+
+
+create a principal component calculator.
+
+given  an index and a list of text :
+calculate the most common words (kill stopwords)
+determine which entries have which of those -- this gives the raw matrix
+determine the principal components of that
+find the projection of the original text onto each of the (top) princ. comp.
+
+
+```{r}
+
+pcx <- function( idx, raw_text) {
+  
+  result <- new.env(emptyenv())
+  
+  result$my_corpus <- VCorpus(VectorSource(raw_text))
+  result$my_corpus <- tm_map(result$my_corpus, stripWhitespace)
+  result$my_corpus <- tm_map(result$my_corpus, content_transformer(tolower))
+  result$my_corpus <- tm_map(result$my_corpus, removeWords, stopwords("english"))
+  result$my_document_term_matrix <- DocumentTermMatrix(result$my_corpus)
+  result$my_tidy_dtm <- tidy(result$my_document_term_matrix ) 
+  result$my_word_counts <- result$my_tidy_dtm %>% group_by(term) %>% mutate(s0=sum(count))
+  result$my_word_counts <- result$my_word_counts[,c(2,4)] %>% unique()
+  # we don't care about any word that appears only once.
+  result$my_word_counts <- result$my_word_counts[result$my_word_counts$s0>1,]
+  result$my_word_counts <- result$my_word_counts[order(result$my_word_counts$s0, decreasing=TRUE),]
+  # messowordz <- 
+  
+  result$get_most_common <- function(a0) {
+    a1 <- (a0%>%diff()) %>% accumulate(`+`)
+    a2 <- 1:length(a1) %>% map( ~ a1[.]/. ) %>% unlist()
+    (which(a2 > -1) %>% min())/2
+  }
+  
+  # take only the most frequently occuring words
+  result$my_word_counts <- result$my_word_counts[ 1:result$get_most_common(result$my_word_counts$s0),]
+  
+  
+  # create the document term matrix for those words
+  result$my_incidence_matrix <- data.frame(idx=idx)
+  for (it in result$my_word_counts$term) {
+    x0 <- result$my_tidy_dtm[  result$my_tidy_dtm$term==it, ]$document
+    x0 <- 1:nrow(result$my_incidence_matrix) %in% x0
+    result$my_incidence_matrix <- result$my_incidence_matrix  %>% cbind(x0) 
+  }
+  colnames(result$my_incidence_matrix) <- c("idx",  result$my_word_counts$term)
+  
+  
+  
+  # get the principal components
+  result$my_principal_component_matrix <- result$my_incidence_matrix[,-1] %>% prcomp()
+  
+  # project the incidence matrix onto the principal components
+  
+  result$project_row_onto_principal_component <- function(the_row, the_pc) {
+    irow <- result$my_incidence_matrix[the_row,-1] %>% as.numeric()
+    ipc <- result$get_principal_component(the_pc) %>% as.numeric()
+    irow %*% ipc
+  }
+  result$project_onto_principal_component <- function(the_pc) {
+    1:nrow(result$my_incidence_matrix) %>% map( ~result$project_row_onto_principal_component(.,the_pc) ) %>% unlist()
+  }
+  
+ #result$my_projection_matrix <- data.frame(idx=result$my_incidence_matrix$idx)
+ 
+ 
+
+ 
+result$fn <- function(p0) {
+  df_ <- data.frame(p0$project_onto_principal_component(1))
+  for (k in 2:10) df_ <- df_ %>% cbind(p0$project_onto_principal_component(k) )
+  df_
+}
+
+# result$my_projection_matrix <-  fn(result) 
+
+
+
+  
+  
+#  for (k in 1:10) { #(result$my_principal_component_matrix$rotation %>% ncol())) {
+#    result$my_projection_matrix <- result$my_projection_matrix %>% cbind(result$my_incidence_matrix$idx) # result$project_onto_principal_component(k))
+#   }
+#  colnames(result$my_projection_matrix) = c("idx", result$my_principal_component_matrix$rotation %>% colnames())
+  
+  
+  
+  
+  result$plot_word_counts <- function() {
+    plot(result$my_word_counts$s0, main="Word Count")
+    legend("topright", legend=result$my_word_counts$term %>% head())
+  }
+  
+  result$get_principal_component <- function(k) result$my_principal_component_matrix $ rotation [ ,k]
+  
+  result$plot_principal_components <- function() {
+    
+    plot(result$get_principal_component(2)~ result$get_principal_component(1))
+  }
+  
+   result$ppc_cat <- function(the_categories) {
+    
+    plot(result$get_principal_component(2)~ result$get_principal_component(1), col=the_categories)
+  }
+  
+  
+  result
+}
+
+
+p0 <- pcx(business_cases_year_17$uui, business_cases_year_17$Brief_Summary)
+
+# p0$the_corpus %>% inspect()
+# p0$my_document_term_matrix %>% inspect()
+#  p0$my_tidy_dtm
+# p0$my_word_counts %>% str()
+
+# p0$plot_word_counts()
+
+
+# dtm <- p0$my_document_term_matrix 
+# p0$my_principal_component_matrix %>% summary()
+# p0$plot_principal_components ()
+
+the_categories <- rep(1, nrow(business_cases_year_17))
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Green"] <- 3
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Red"] <- 2
+
+# p0$ppc_cat(the_categories)
+
+p0$project_row_onto_principal_component(5,1)
+# p0$my_projection_matrix %>% head()
+p0$project_onto_principal_component(2) %>% head()
+
+
+# 1:nrow(p0$my_incidence_matrix) %>% map( ~p0$project_row_onto_principal_component(.,1) ) %>% unlist()
+
+q0 <- p0$fn(p0)
+colnames(q0) <- colnames(p0$my_principal_component_matrix$rotation)[1:10]
+# q0 <- q0 %>% cbind(the_categories)
+
+plot(q0[,1]~q0[,2],col=the_categories)
+
+qqda0 <- qda(the_categories ~ . , data=q0)
+
+```
+
+
+
+```{r}
+
+
+
+ff1 <- function() {
+
+tr <- sample(1:nrow(q0), 600)
+train <- q0[tr,]
+test <- q0[-tr,]
+z <- qda(train, the_categories[tr])
+table(predict(z, test)$class, the_categories[-tr])
+
+}
+
+ffnaive <- function() {
+  
+  tr <- sample(1:nrow(q0), 600)
+  train <- q0[tr,]
+  test <- q0[-tr,]
+  # z <- qda(train, the_categories[tr])
+  
+  
+  table(rep(3,the_categories[-tr]%>%length() ), the_categories[-tr])
+  
+}
+
+
+
+ffn <- function() {
+
+tr <- sample(1:nrow(q0), 600)
+train <- q0[tr,]
+test <- q0[-tr,]
+z <- qda(train, the_categories[tr])
+e0 <- table(predict(z, test)$class, the_categories[-tr])
+
+error_rate <- function(e0) {
+  ok <- 1:(e0 %>% nrow()) %>% map(~e0[.,.]) %>% unlist() %>% sum()
+  tot <- e0 %>% sum()
+  (tot-ok)/tot
+}
+
+e0 %>% error_rate()
+
+}
+
+
+
+e1 <- 1:99 %>% map(~ffn()) %>% unlist()
+
+```
+
+
+```{r}
+
+ff1()
+
+ffenaive <- function() {
+  n0 <- ffnaive()
+  (sum(n0)-n0[1,3])/sum(n0)
+}
+
+e2 <- 1:99 %>% map(~ffenaive()) %>% unlist()
+
+
+```
+
+
+
+
+
+
+```{r}
+
+
+fn <- function(p0) {
+  df_ <- data.frame(p0$project_onto_principal_component(1))
+  for (k in 2:10) df_ <- df_ %>% cbind(p0$project_onto_principal_component(k) )
+  df_
+}
+
+fn(p0)
+
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+x17$uui <- (x17$uui02 + x17$uui01*1000000000 )
+
+
+
+x17 <- x17[, c(1, 4,5)]
+the_color <- rep(1, nrow(x0))
+the_color[ x17$CIO_Evaluation_Color=='Green' ] <- 3
+the_color[ x17$CIO_Evaluation_Color=='Red' ]   <- 2
+
+x17 <- x17 %>% cbind(the_color)
+x17 <- x17[,-2]
+
+```
+
+
+get incidence of each of these nice words, in the business case descriptions
+
+```{r}
+
+get_incidence <- function(the_col, the_word) {
+  grepl(the_word, the_col, fixed=TRUE)
+}
+
+
+m17 <- data.frame( x17$uui )
+
+for (it in names(mt1) ) m17 <- m17 %>% cbind(x17$Brief_Summary %>% get_incidence(it) )
+
+colnames(m17) <- c("uui", paste0("w_", names(mt1) ))
+
+```
+
+Get the projection of the original business case summaries back down into the principal components.
+
+```{r}
+
+project_onto_kth_component <- function(pcompmtx, domain, k) {
+
+   (domain %>% as.numeric()) %*% (pcompmtx$rotation[,k] %>% as.numeric())
+
+}
+
+project_all_onto_kth_component <- function( pcompmtx, domain, k) { 
+
+  1:nrow(domain) %>% map( ~ project_onto_kth_component( pcompmtx,  domain[.,-1], k )) %>% unlist()
+
+}
+
+
+x17 <- x17 %>% cbind( pcx1=p0 %>% project_all_onto_kth_component ( m17, 1) )
+x17 <- x17 %>% cbind( pcx2=p0 %>% project_all_onto_kth_component ( m17, 2) )
+# p0 %>% project_all_onto_kth_component ( m0, 1)
+
+```
+
+
+
+```{r}
+
+plot(pcx2~pcx1, col=the_color, data=x17)
+
+```
+
+
+```{r}
+
+
+qda0 %>% predict( x17[,4:5])
+
+```
+
+
+
+
+
+
