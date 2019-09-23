@@ -27,7 +27,11 @@ library(NLP)
 # library(openNLP)
 
 library(odbc)
-con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
+
+
+# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
 
 
 ```
@@ -56,106 +60,40 @@ find the projection of the original text onto each of the (top) princ. comp.
 
 ```{r}
 
-pcx <- function( idx, raw_text) {
-  
-  result <- new.env(emptyenv())
-  
-  result$my_corpus <- VCorpus(VectorSource(raw_text))
-  result$my_corpus <- tm_map(result$my_corpus, stripWhitespace)
-  result$my_corpus <- tm_map(result$my_corpus, content_transformer(tolower))
-  result$my_corpus <- tm_map(result$my_corpus, removeWords, stopwords("english"))
-  result$my_document_term_matrix <- DocumentTermMatrix(result$my_corpus)
-  result$my_tidy_dtm <- tidy(result$my_document_term_matrix ) 
-  result$my_word_counts <- result$my_tidy_dtm %>% group_by(term) %>% mutate(s0=sum(count))
-  result$my_word_counts <- result$my_word_counts[,c(2,4)] %>% unique()
-  # we don't care about any word that appears only once.
-  result$my_word_counts <- result$my_word_counts[result$my_word_counts$s0>1,]
-  result$my_word_counts <- result$my_word_counts[order(result$my_word_counts$s0, decreasing=TRUE),]
-  # messowordz <- 
-  
-  result$get_most_common <- function(a0) {
-    a1 <- (a0%>%diff()) %>% accumulate(`+`)
-    a2 <- 1:length(a1) %>% map( ~ a1[.]/. ) %>% unlist()
-    (which(a2 > -1) %>% min())/2
-  }
-  
-  # take only the most frequently occuring words
-  result$my_word_counts <- result$my_word_counts[ 1:result$get_most_common(result$my_word_counts$s0),]
-  
-  
-  # create the document term matrix for those words
-  result$my_incidence_matrix <- data.frame(idx=idx)
-  for (it in result$my_word_counts$term) {
-    x0 <- result$my_tidy_dtm[  result$my_tidy_dtm$term==it, ]$document
-    x0 <- 1:nrow(result$my_incidence_matrix) %in% x0
-    result$my_incidence_matrix <- result$my_incidence_matrix  %>% cbind(x0) 
-  }
-  colnames(result$my_incidence_matrix) <- c("idx",  result$my_word_counts$term)
-  
-  
-  
-  # get the principal components
-  result$my_principal_component_matrix <- result$my_incidence_matrix[,-1] %>% prcomp()
-  
-  # project the incidence matrix onto the principal components
-  
-  result$project_row_onto_principal_component <- function(the_row, the_pc) {
-    irow <- result$my_incidence_matrix[the_row,-1] %>% as.numeric()
-    ipc <- result$get_principal_component(the_pc) %>% as.numeric()
-    irow %*% ipc
-  }
-  result$project_onto_principal_component <- function(the_pc) {
-    1:nrow(result$my_incidence_matrix) %>% map( ~result$project_row_onto_principal_component(.,the_pc) ) %>% unlist()
-  }
-  
- #result$my_projection_matrix <- data.frame(idx=result$my_incidence_matrix$idx)
- 
- 
-
- 
-result$fn <- function(p0) {
-  df_ <- data.frame(p0$project_onto_principal_component(1))
-  for (k in 2:10) df_ <- df_ %>% cbind(p0$project_onto_principal_component(k) )
-  df_
-}
-
-# result$my_projection_matrix <-  fn(result) 
-
-
-
-  
-  
-#  for (k in 1:10) { #(result$my_principal_component_matrix$rotation %>% ncol())) {
-#    result$my_projection_matrix <- result$my_projection_matrix %>% cbind(result$my_incidence_matrix$idx) # result$project_onto_principal_component(k))
-#   }
-#  colnames(result$my_projection_matrix) = c("idx", result$my_principal_component_matrix$rotation %>% colnames())
-  
-  
-  
-  
-  result$plot_word_counts <- function() {
-    plot(result$my_word_counts$s0, main="Word Count")
-    legend("topright", legend=result$my_word_counts$term %>% head())
-  }
-  
-  result$get_principal_component <- function(k) result$my_principal_component_matrix $ rotation [ ,k]
-  
-  result$plot_principal_components <- function() {
-    
-    plot(result$get_principal_component(2)~ result$get_principal_component(1))
-  }
-  
-   result$ppc_cat <- function(the_categories) {
-    
-    plot(result$get_principal_component(2)~ result$get_principal_component(1), col=the_categories)
-  }
-  
-  
-  result
-}
-
+source("pcx01.R")
 
 p0 <- pcx(business_cases_year_17$uui, business_cases_year_17$Brief_Summary)
+
+# : my_corups
+# : my_document_term_matrix
+# : my_incidence_matrix
+# : my_principal_component_matrix
+# : my_tidy_dtm
+
+
+# p0$project_onto_principal_component(2) - p0$project_onto_principal_component(1)
+p0$my_projection_matrix %>% View()
+
+# p0$plot_word_counts()
+# p0 %>% ls.str()
+
+save(p0, file="p0.RData")
+
+
+```
+
+
+
+```{r}
+
+load("p0.RData")
+
+p0$plot_word_counts()
+
+```
+
+
+
 
 # p0$the_corpus %>% inspect()
 # p0$my_document_term_matrix %>% inspect()
@@ -190,7 +128,133 @@ plot(q0[,1]~q0[,2],col=the_categories)
 
 qqda0 <- qda(the_categories ~ . , data=q0)
 
+
+
+```{r}
+
+
+some_table_information <- function(the_table) {
+  
+  result <- new.env(emptyenv())
+  
+  result$true_positive <- the_table[2,2]
+  result$true_negative <- the_table[1,1]
+  result$false_positive <- the_table[2,1]
+  result$false_negative <- the_table[1,2]
+  
+  result$positive <- result$true_positive + result$false_negative
+  result$negative <- result$true_negative + result$false_positive
+  
+  result$true_positive_rate <- result$true_positive/result$positive 
+  result$false_positive_rate <- result$false_positive/result$negative 
+
+  result$roc <- c(false_positive_rate=result$false_positive_rate, true_positive_rate=result$true_positive_rate )  
+  
+  
+  result
+
+}
+
+pcxqda <- function(the_principal_components, the_categories) {
+  
+  result <- new.env(emptyenv())
+  result$my_category_table <- the_categories %>% table()
+  
+  result$df <- cbind(the_categories, the_principal_components)
+  
+  result$how_many_cols_to_use <- function() min( min(result$my_category_table)/2, ncol(the_principal_components))
+  
+  result$qqda0 <- MASS::qda(the_principal_components[,1:result$how_many_cols_to_use()] , the_categories )
+  result$get_pr_comp_on_which_to_regress <- function () the_principal_components[,1:result$how_many_cols_to_use()]
+  
+
+
+  result$ff1 <- function(the_proportion) {
+    rresult <- new.env(emptyenv())
+    the_pr_comp_on_which_to_regress <- result$get_pr_comp_on_which_to_regress ()  
+    n <- nrow(the_pr_comp_on_which_to_regress)
+    
+    tr <- sample(1:n, floor(the_proportion*n) )
+    train <- the_pr_comp_on_which_to_regress[tr,]
+    test <- the_pr_comp_on_which_to_regress[-tr,]
+    rresult$z <- MASS::qda(train, the_categories[tr])
+
+    rresult$table <- table(pred=predict(rresult$z, test)$class, true=the_categories[-tr])
+    rresult$roc <- some_table_information(rresult$table)
+    rresult
+  }
+  
+  result$ff2 <- function(the_proportion, the_prior) {
+    rresult <- new.env(emptyenv())
+    the_pr_comp_on_which_to_regress <- result$get_pr_comp_on_which_to_regress ()  
+    n <- nrow(the_pr_comp_on_which_to_regress)
+    
+    tr <- sample(1:n, floor(the_proportion*n) )
+    train <- the_pr_comp_on_which_to_regress[tr,]
+    test <- the_pr_comp_on_which_to_regress[-tr,]
+    rresult$z <- MASS::qda(train, the_categories[tr])
+    
+    rresult$table <- table(pred=predict(rresult$z, test, prior=c(the_prior, 1-the_prior))$class, true=the_categories[-tr])
+    rresult$roc <- some_table_information(rresult$table)
+    rresult
+  }
+  
+    result$ff3_lda <- function(the_proportion, the_prior) {
+    rresult <- new.env(emptyenv())
+    the_pr_comp_on_which_to_regress <- result$get_pr_comp_on_which_to_regress ()  
+    n <- nrow(the_pr_comp_on_which_to_regress)
+    
+    tr <- sample(1:n, floor(the_proportion*n) )
+    train <- the_pr_comp_on_which_to_regress[tr,]
+    test <- the_pr_comp_on_which_to_regress[-tr,]
+    rresult$z <- MASS::lda(train, the_categories[tr])
+    
+    rresult$table <- table(pred=predict(rresult$z, test, prior=c(the_prior, 1-the_prior))$class, true=the_categories[-tr])
+    rresult$roc <- some_table_information(rresult$table)
+    rresult
+  }
+
+
+  result
+  
+  
+}
+
+
+
+
+the_categories <- rep(1, nrow(business_cases_year_17))
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Green"] <- 0
+# the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Red"] <- 2
+
+pq0 <- pcxqda(p0$my_projection_matrix[,-1], the_categories)
+
+x0 <- pq0$ff1(.9)
+
+# x0 %>% ls.str()
+# x0$roc %>% ls.str()
+# x0$table
 ```
+
+
+```{r}
+
+
+df0 <- data.frame(  t(pq0$ff3_lda(.9, 0)$roc$roc) )
+for (k in 1:100) df0 <- df0 %>% rbind(t(pq0$ff3_lda(.9, k/100)$roc$roc ))
+
+df0
+
+plot(true_positive_rate~false_positive_rate, data=df0)
+abline(0,1, col='blue')
+
+
+```
+
+
+
+
+
 
 
 
