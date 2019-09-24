@@ -40,7 +40,7 @@ con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode}
 
 ```{sql connection=con,  output.var="business_cases_year_17"}
 
-SELECT "Brief_Summary" , 
+SELECT "Brief_Summary" ::varchar(4096), 
   uui01::bigint*1000000000+uui02 AS uui, 
   
   "CIO_Evaluation_Color" from public.business_case_alpha WHERE year=17
@@ -57,6 +57,8 @@ determine which entries have which of those -- this gives the raw matrix
 determine the principal components of that
 find the projection of the original text onto each of the (top) princ. comp.
 
+## Calculation
+skip this section if not re-calculating, and just load the result
 
 ```{r}
 
@@ -82,13 +84,71 @@ save(p0, file="p0.RData")
 
 ```
 
-
+## Load the result
 
 ```{r}
+
+source("pcx01.R")
+
 
 load("p0.RData")
 
 p0$plot_word_counts()
+
+```
+
+
+
+Let's put some .csv for those who want to analyze that way
+
+```{r}
+p0$my_incidence_matrix %>% write_csv("incidence.csv")
+
+
+p0$my_projection_matrix %>% write_csv("projection.csv")
+
+
+pc0 <- data.frame(term=p0$my_principal_component_matrix$rotation %>% rownames())            %>%       cbind(p0$my_principal_component_matrix$rotation %>% as.data.frame() ) %>%
+  write_csv("princ_comp.csv")
+
+
+
+```
+
+
+# exposition
+? What are the most/least common words in each PCX?
+? Which are the BC that are most/least representative of each PCX?
+
+```{r}
+
+
+
+
+fn <- function(pcx, n=5) {
+  the_pcx <- p0$get_principal_component(n) %>% sort(TRUE)
+  h0 <- the_pcx %>% head(n)
+  t0 <- the_pcx %>% tail(n)
+  x0 <- c(h0, t0) 
+  the_col <- c (rep(1,n), rep(2,n))
+  x0 %>% barplot( main=paste("Princ. Comp. #", pcx) , col=the_col, cex.lab=.5)  
+  legend( "topright",legend= names(x0), cex=.62, fill=the_col)
+
+}
+
+fn(1)
+
+```
+
+
+
+
+
+
+
+```{r}
+
+p0 %>% ls.str()
 
 ```
 

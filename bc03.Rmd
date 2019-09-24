@@ -1,0 +1,192 @@
+---
+title: "bc02"
+author: "Phillip Abbott"
+date: "Tue 24 Sep XIX"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+
+library(tidyverse)
+
+
+
+library(tidytext)
+library(tm)
+library(e1071)
+library(odbc)
+
+library(NLP)
+# library(openNLP)
+
+library(odbc)
+
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
+
+
+# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+
+
+```
+
+
+
+```{sql connection=con,  output.var="business_cases_year_17"}
+
+SELECT "Brief_Summary" ::varchar(4096), 
+  uui01::bigint*1000000000+uui02 AS uui, 
+  
+  "CIO_Evaluation_Color" from public.business_case_alpha WHERE year=17
+
+```
+
+## Load the result
+
+```{r}
+
+source("pcx01.R")
+
+
+load("p0.RData")
+
+
+
+```
+
+# no
+
+# can we find a correlation?
+
+I did a naive logistic regression on 'gre          en or not' against the first few dozen principal components, a few at a time.  I threw out all the variables that R didn't show as significant with at least a '.'.  This is the list I was left with.  The next question is:  how good is this model, in terms of the ROC curve?  Can we improve it by taking out terms or adding other information (e.g. department).  To answer that question, one needs to calculate the ROC curve, which involves evaluating the prediction at different levels of probability.
+
+```{r}
+
+some_nice_pcx <- c(1,2,4,5, 9, 11, 18, 25, 33, 40, 48, 58, 60, 73, 76, 79, 95, 96, 97, 115, 116, 118)
+
+the_categories <- rep(1, nrow(business_cases_year_17))
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Green"] <- 0
+
+
+p2 <- p0$my_projection_matrix[,(some_nice_pcx+1)] %>% cbind(the_categories)
+
+p2$the_categories <- p2$the_categories
+
+hm <- glm(the_categories~., data=p2, family=binomial)
+
+summary(hm)
+
+```
+
+
+
+```{r}
+
+source("test_model.R")
+source("some_table_information.R")
+source("roc_info.R")
+
+hyper <- function(the_model, the_data, the_proportion) {
+  result <- new.env(emptyenv())
+  
+    t0 <- test_model(the_categories~., p2, 0.9)
+    t1 <- t0$test[,c("the_categories", "pred")]
+
+    x0 <- roc_info_all( t1$the_categories, t1$pred )
+
+    result$plot_me <- function() x0$plot_me()
+    result$get_auc <- function() x0$get_auc()
+
+    result
+
+}
+
+# we assume the dependent variable is in the last column
+get_random_sample<- function(the_data) {
+  n <- (the_data %>% ncol()) - 1
+  how_many <- sample(1:(n-1), 1)
+  the_sample <- sample(1:n, how_many)
+  the_sample
+}
+
+asitd <- data.frame( trs=p2 %>% get_random_sample()  %>% reduce(paste), auc=0 )
+
+for (k in 1:1000) {
+  trs <- p2 %>% get_random_sample()
+  auc <- hyper(the_categories~., p2[,-trs], 0.9)$get_auc()
+  trs_ <- (1:(ncol(p2)-1) %>% setdiff (trs)  ) %>% reduce(paste)
+  
+  if (.8 < auc)
+  asitd <- asitd %>% rbind( t( c(trs=trs_ , auc=auc)))
+}
+
+asitd <- asitd[order(asitd$auc),]
+
+# h0 <- hyper(the_categories~., p2[,-1:2], 0.9)
+
+# h0$plot_me()
+# h0$get_auc()
+
+
+```
+
+Some models with good AUC:
+
+10 14 17
+
+1 3 4 6 7 8 9 11 12 13 14 15 16 17 18 19 20 21 22
+
+```{r}
+
+
+
+
+ h0 <- hyper(the_categories~., p2[,c(1, 3, 4, 6, 7, 8, 9, 11:22)], 0.9)
+h0$plot_me()
+h0$get_auc()
+
+```
+
+
+
+
+
+
+1 16
+0.800909090909091
+10
+11 5 21 19 16 14 9 2 17 3 6 8 20 10 13 22 15 18 7
+
+
+t0 <- test_model(the_categories~., p2, 0.9)
+t1 <- t0$test[,c("the_categories", "pred")]
+# x0_ <- roc_info( t1$the_categories, t1$pred, .5)
+x0 <- roc_info_all( t1$the_categories, t1$pred )
+
+
+# plot(true_positive_rate~false_positive_rate, data=x0$df)
+# abline(0,1)
+x0$plot_me()
+
+x0$get_auc()
+
+
+
+roc01 <- x0$df[order(x0$df$false_positive_rate),]
+auc <- 0
+for (k in 2:nrow(roc01)) {
+    x_0 <- roc01[k-1, "false_positive_rate"] 
+    x_1 <- roc01[k, "false_positive_rate"] 
+    y_1 <- roc01[k, "true_positive_rate"] 
+    auc <- auc + y_1*(x_1-x_0)
+}
+
+auc
+
+
