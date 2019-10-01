@@ -7,7 +7,8 @@ roc_info <- function(the_categories, the_probabilities, the_cutoff) {
   result$df <- data.frame(actual=the_categories, the_probabilities) %>% cbind( predicted=the_cutoff<  the_probabilities)
   
   result$tbl <- table(actual=result$df$actual, predicted=result$df$predicted)
-  result$roc <- some_table_information( result$tbl )
+  cat(the_cutoff)
+  result$roc <- c(cutoff=the_cutoff, some_table_information( result$tbl ))
   
   
   result

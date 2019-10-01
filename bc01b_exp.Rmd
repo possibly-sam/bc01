@@ -28,10 +28,10 @@ library(NLP)
 
 library(odbc)
 
-con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
+# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
 
 
-# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+ con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
 
 
 ```
@@ -133,6 +133,13 @@ fn(5)
 ```
 
 
+## Principal Component #18
+```{r}
+
+fn(18)
+```
+
+
 # Get BC most/least representative of a given Principal Component
 ```{r}
 
@@ -161,6 +168,8 @@ fn2 <- function(pcx, n=5) {
 
 ff <- list()
 for (k in 1:5) ff[[k]] <- fn2(k)
+
+ff[[18]] <- fn2(18)
 
 #fn2(1)
 
@@ -220,7 +229,7 @@ for (k in 1:5) ff[[k]] <- fn2(k)
 `r ff[[2]]$get_most_like_text(5)`
 
 
-# Business Case descriptions least associated with Principal Component #1
+# Business Case descriptions least associated with Principal Component #2
 
 ## ID `r ff[[2]]$get_least_like_idx(1)`  Value = `r ff[[2]]$get_least_like_value(1)`
 `r ff[[2]]$get_least_like_text(1)`
@@ -236,6 +245,44 @@ for (k in 1:5) ff[[k]] <- fn2(k)
 
 ## ID `r ff[[2]]$get_least_like_idx(5)`  Value = `r ff[[2]]$get_least_like_value(5)`
 `r ff[[2]]$get_least_like_text(5)`
+
+
+
+# Business Case descriptions most associated with Principal Component #18
+
+## ID `r ff[[18]]$get_most_like_idx(1)` Value = `r ff[[18]]$get_most_like_value(1)`
+`r ff[[18]]$get_most_like_text(1)`
+
+## ID `r ff[[18]]$get_most_like_idx(2)`  Value = `r ff[[18]]$get_most_like_value(2)`
+`r ff[[18]]$get_most_like_text(2)`
+
+## ID `r ff[[18]]$get_most_like_idx(3)`  Value = `r ff[[18]]$get_most_like_value(3)`
+`r ff[[18]]$get_most_like_text(3)`
+
+## ID `r ff[[18]]$get_most_like_idx(4)`  Value = `r ff[[18]]$get_most_like_value(4)`
+`r ff[[18]]$get_most_like_text(4)`
+
+## ID `r ff[[18]]$get_most_like_idx(5)`  Value = `r ff[[18]]$get_most_like_value(5)`
+`r ff[[18]]$get_most_like_text(5)`
+
+
+# Business Case descriptions least associated with Principal Component #18
+
+## ID `r ff[[18]]$get_least_like_idx(1)`  Value = `r ff[[18]]$get_least_like_value(1)`
+`r ff[[18]]$get_least_like_text(1)`
+
+## ID `r ff[[18]]$get_least_like_idx(2)`  Value = `r ff[[18]]$get_least_like_value(2)`
+`r ff[[18]]$get_least_like_text(2)`
+
+## ID `r ff[[18]]$get_least_like_idx(3)`  Value = `r ff[[18]]$get_least_like_value(3)`
+`r ff[[18]]$get_least_like_text(3)`
+
+## ID `r ff[[18]]$get_least_like_idx(4)`  Value = `r ff[[18]]$get_least_like_value(4)`
+`r ff[[18]]$get_least_like_text(4)`
+
+## ID `r ff[[18]]$get_least_like_idx(5)`  Value = `r ff[[18]]$get_least_like_value(5)`
+`r ff[[18]]$get_least_like_text(5)`
+
 
 
 
@@ -273,18 +320,7 @@ summary(hm)
 
 
 
-```{r}
 
-  
-  
-
-```
-
-
-
-
-
-```{r}
 
 
   test_model <- function(the_formula, the_data, the_proportion) {
@@ -320,10 +356,6 @@ happy %>% summary()
 sad %>% summary()
 
 
-```
-
-
-```{r}
 
 
 
@@ -349,7 +381,6 @@ monday(t0$hm, t0$test, .5)
 
 
 
-```
 
 
 
@@ -359,11 +390,10 @@ monday(t0$hm, t0$test, .5)
 
 
 
-```{r}
 
 
 p0$my_principal_component_matrix %>% summary()
-```
+
 
 
 

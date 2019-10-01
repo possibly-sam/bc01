@@ -28,10 +28,11 @@ library(NLP)
 
 library(odbc)
 
-con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
+# cloud version
+# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
 
-
-# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+# local copy
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
 
 
 ```
@@ -82,7 +83,44 @@ hm <- glm(the_categories~., data=p2, family=binomial)
 
 summary(hm)
 
+# 1 2 4
+# 1 2 4 9 18 60 95 97
+
 ```
+
+after we remove the ones with no significance, some of them lose significance again.
+
+
+# plot 2 of the pcx against each other
+
+```{r}
+
+plot(p0$my_projection_matrix[,3]~p0$my_projection_matrix[,19], col= the_categories+1)
+
+```
+
+
+
+
+
+```{r}
+
+
+some_nice_pcx <- c(1,2,4, 9, 18,  60, 95, 97)
+
+p2 <- p0$my_projection_matrix[,(some_nice_pcx+1)] %>% cbind(the_categories)
+
+
+hm <- glm(the_categories~., data=p2, family=binomial)
+
+summary(hm)
+
+
+
+
+```
+
+
 
 
 
@@ -117,7 +155,101 @@ get_random_sample<- function(the_data) {
 
 asitd <- data.frame( trs=p2 %>% get_random_sample()  %>% reduce(paste), auc=0 )
 
-for (k in 1:1000) {
+# need to take a non-trivial number of samples with a given set of parameters
+
+# dependent variable is called the_category and is in the last column
+get_auc_distribution <- function( some_nice_random_sample, the_data, the_proportion = 0.9, the_distribution_size = 30) {
+  
+  1:the_distribution_size %>% map (~hyper(the_categories~., the_data[,-some_nice_random_sample], the_proportion)$get_auc() ) %>% unlist()
+  
+}
+
+trs80 <- p2 %>% get_random_sample()
+x0 <- trs80 %>% get_auc_distribution(p2)
+
+x0 %>% summary()
+
+x0 %>% boxplot(x0)
+```
+
+
+# taking p2 with its reduced list -- just 8 columns
+
+
+```{r}
+
+x0 <- 1:8 %>% get_auc_distribution(p2)
+
+
+x1 <- c(1,2,4,5,6) %>% get_auc_distribution(p2)
+
+x2 <-  c(2,5) %>% get_auc_distribution(p2)
+x0 %>% summary()
+x1 %>% summary()
+x2 %>% summary()
+
+ boxplot(x0, x1, x2)
+
+```
+
+principal component 18 seems to have magical properties.  putting it in with pc2 gives us about as cood auc as anything else.
+
+
+
+
+# this is a heavy calculation.
+
+```{r}
+
+some_submodels <- list()
+
+for (k in 1:22) {
+  the_sample <- 1:k
+  some_submodels[[k]] <- the_sample %>% get_auc_distribution(p2)
+}
+
+
+```
+
+
+
+
+
+```{r}
+
+boxplot( some_submodels[[1]],  some_submodels[[2]],  some_submodels[[3]],  some_submodels[[4]],
+         some_submodels[[5]],  some_submodels[[6]],  some_submodels[[7]],  some_submodels[[8]],
+         some_submodels[[9]],  some_submodels[[10]], some_submodels[[11]], some_submodels[[12]],
+         some_submodels[[13]], some_submodels[[14]], some_submodels[[15]], some_submodels[[16]],
+         some_submodels[[17]], some_submodels[[18]], some_submodels[[19]], some_submodels[[20]])
+
+```
+
+```{r}
+idx <- 1:21
+mmean <- idx %>% map(~some_submodels[[.]] %>% mean()) %>% unlist()
+mmead <- idx %>% map(~some_submodels[[.]] %>% median()) %>% unlist()
+
+mdf <- data.frame(idx, mmean, mmead)
+
+mdf[order(mdf$mmean, decreasing=TRUE), ]
+
+plot(mmead~mmean,data=mdf)
+
+```
+
+? Maybe including the first 3 would be an acceptable compromise over everything?
+
+
+
+
+
+
+ Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ 0.5033  0.5885  0.6232  0.6374  0.6882  0.7870 
+
+
+for (k in 1:100) {
   trs <- p2 %>% get_random_sample()
   auc <- hyper(the_categories~., p2[,-trs], 0.9)$get_auc()
   trs_ <- (1:(ncol(p2)-1) %>% setdiff (trs)  ) %>% reduce(paste)
@@ -134,7 +266,7 @@ asitd <- asitd[order(asitd$auc),]
 # h0$get_auc()
 
 
-```
+
 
 Some models with good AUC:
 
@@ -188,5 +320,32 @@ for (k in 2:nrow(roc01)) {
 }
 
 auc
+
+
+
+
+
+```{r}
+ 
+
+pcm02 <- p0$my_principal_component_matrix$rotation
+
+fn <- function(k) pcm02[1,] %*% pcm02[k,]
+
+fn(2)
+
+```
+
+```{r}
+
+
+im01 <- p0$my_incidence_matrix
+
+```
+
+
+
+
+
 
 
