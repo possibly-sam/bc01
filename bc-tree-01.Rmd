@@ -1,0 +1,176 @@
+---
+title: "bc-tree-01"
+author: "Phillip Abbott"
+date: "Tue 24 Sep XIX"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+too many words..trying to see if I can get an intuitive understanding with fewer words.
+?Trees?
+
+```{r}
+
+
+library(tidyverse)
+library(tree)
+
+
+
+library(tidytext)
+library(tm)
+library(e1071)
+library(odbc)
+
+library(NLP)
+# library(openNLP)
+
+library(odbc)
+
+# cloud version
+con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
+
+# local copy
+# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+
+
+```
+
+
+
+```{sql connection=con,  output.var="business_cases_year_17"}
+
+SELECT "Brief_Summary" ::varchar(4096), 
+  uui01::bigint*1000000000+uui02 AS uui, 
+  
+  "CIO_Evaluation_Color" from public.business_case_alpha WHERE year=17
+
+```
+
+
+
+
+
+# re-calculate, but with massively reduced number of words under consideration.
+
+
+
+## Calculation
+skip this section if not re-calculating, and just load the result
+
+```{r}
+
+source("pcx01.R")
+
+p5 <- pcx(business_cases_year_17$uui, business_cases_year_17$Brief_Summary, function(x) 10)
+
+# : my_corups
+# : my_document_term_matrix
+# : my_incidence_matrix
+# : my_principal_component_matrix
+# : my_tidy_dtm
+
+
+# p0$project_onto_principal_component(2) - p0$project_onto_principal_component(1)
+p5$my_projection_matrix %>% View()
+
+# p0$plot_word_counts()
+# p0 %>% ls.str()
+
+
+
+
+the_categories <- rep(1, nrow(business_cases_year_17))
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Green"] <- 0
+
+save(p5,the_categories,  file="p5.RData")
+
+```
+
+```{r}
+source("pcx01.R")
+
+source("test_model.R")
+source("some_table_information.R")
+source("roc_info.R")
+
+load("p5.RData")
+
+q0 <- p5$my_incidence_matrix  %>% cbind(the_categories)
+q1 <- p5$my_projection_matrix %>% cbind(the_categories)
+# p5$my_incidence_matrix %>% str()
+
+```
+
+
+```{r}
+
+source("pcx01.R")
+pp0 <- ppcx(p5,the_categories )
+
+pp0$get_incidence_logistic_model() %>% summary()
+
+table(data=pp0$my_incidence_matrix$data,naughty= pp0$my_incidence_matrix$the_categories) %>% barplot()
+
+pp0$get_incidence_logistic_model() %>% summary()
+
+```
+
+
+
+```{r}
+
+hm <- tree(the_categories~., pp0$my_projection_matrix[,-1])
+
+hm %>% summary()
+
+hm %>% plot()
+hm %>% text()
+```
+
+
+
+there really does seem to be something to pcx_4
+
+```{r}
+
+pcx04_ <- p5$my_principal_component_matrix$rotation %>% as.data.frame()
+
+pcx04 <- data.frame(name=pcx04_%>% rownames(), val=pcx04_$PC4 )
+
+pcx04 <- pcx04[order(pcx04$val,decreasing=TRUE),]
+
+pcx04b <- pcx04[c(1:4,7:10),]
+
+barplot(pcx04b$val, names.arg = pcx04b$name, legend.text =pcx04b$name )
+
+pp0$my_projection_matrix %>% str()
+
+boxplot(pcx_4~the_categories, data=pp0$my_projection_matrix)
+
+```
+
+
+
+
+
+```{r}
+data(cpus, package="MASS")
+cpus.ltr <- tree(log10(perf) ~ syct+mmin+mmax+cach+chmin+chmax, cpus)
+cpus.ltr
+summary(cpus.ltr)
+plot(cpus.ltr);  text(cpus.ltr)
+
+ir.tr <- tree(Species ~., iris)
+ir.tr
+summary(ir.tr)
+```
+
+
+
+
+
+
