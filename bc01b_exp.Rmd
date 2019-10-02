@@ -1,0 +1,405 @@
+---
+title: "bc01b"
+author: "Phillip Abbott"
+date: "September 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+
+library(tidyverse)
+
+
+
+library(tidytext)
+library(tm)
+library(e1071)
+library(odbc)
+
+library(NLP)
+# library(openNLP)
+
+library(odbc)
+
+# con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Server=mcfc01.c4hbjfyzingo.eu-west-2.rds.amazonaws.com;Database=mcfc01;UID=mcfcuser01;PWD=projecthack01")
+
+
+ con <- dbConnect(odbc::odbc(), .connection_string = "Driver={PostgreSQL Unicode};Database=usit_alpha")
+
+
+```
+
+
+
+```{sql connection=con,  output.var="business_cases_year_17"}
+
+SELECT "Brief_Summary" ::varchar(4096), 
+  uui01::bigint*1000000000+uui02 AS uui, 
+  
+  "CIO_Evaluation_Color" from public.business_case_alpha WHERE year=17
+
+```
+
+```{r}
+
+# stringi::stri_length(business_cases_year_17[,1])
+
+stringi::stri_length(business_cases_year_17[,1]) %>% max()
+```
+
+## Load the result
+
+```{r}
+
+source("pcx01.R")
+
+
+load("p0.RData")
+
+
+
+```
+
+
+
+
+# exposition
+? What are the most/least common words in each PCX?
+? Which are the BC that are most/least representative of each PCX?
+
+```{r}
+
+
+
+
+fn <- function(pcx, n=5) {
+  the_pcx <- p0$get_principal_component(pcx) %>% sort(TRUE)
+  h0 <- the_pcx %>% head(n)
+  t0 <- the_pcx %>% tail(n)
+  x0 <- c(h0, t0) 
+  the_col <- c (rep(1,n), rep(2,n))
+  x0 %>% barplot( main=paste("Princ. Comp. #", pcx) , col=the_col, cex.lab=.5)  
+  legend( "topright",legend= names(x0), cex=.62, fill=the_col)
+
+}
+
+# fn(1)
+
+```
+
+
+# A Picture of the principal components
+
+## Principal Component #1
+```{r}
+
+fn(1)
+```
+
+
+## Principal Component #2
+```{r}
+
+fn(2)
+```
+
+
+
+## Principal Component #3
+```{r}
+
+fn(3)
+```
+
+
+## Principal Component #4
+```{r}
+
+fn(4)
+```
+
+
+## Principal Component #5
+```{r}
+
+fn(5)
+```
+
+
+## Principal Component #18
+```{r}
+
+fn(18)
+```
+
+
+# Get BC most/least representative of a given Principal Component
+```{r}
+
+oorder <- function(it) order(it, decreasing=TRUE)
+
+
+fn2 <- function(pcx, n=5) {
+  result <- new.env(emptyenv())
+  
+  the_pcx <- p0$my_projection_matrix[, (1+pcx)]
+  the_order <- oorder(the_pcx)
+  x0 <- p0$my_projection_matrix[the_order, c(1,(pcx+1))] 
+  x0 <- ( x0 %>% head(n) ) %>% rbind( x0 %>% tail(n))
+  result$x0 <- x0 %>% left_join( business_cases_year_17 , by = c("idx" = "uui"))
+
+  result$get_most_like_idx <- function(k) result$x0[k,1] %>% as.character()
+  result$get_most_like_value <- function(k) result$x0[k,2]
+  result$get_most_like_text <- function(k) result$x0[k,3]
+
+  result$get_least_like_idx <- function(k) result$x0[n*2+1-k,1] %>% as.character()
+  result$get_least_like_value <- function(k) result$x0[n*2+1-k,2]
+  result$get_least_like_text <- function(k) result$x0[n*2+1-k,3]
+   
+  result
+}
+
+ff <- list()
+for (k in 1:5) ff[[k]] <- fn2(k)
+
+ff[[18]] <- fn2(18)
+
+#fn2(1)
+
+```
+
+# Business Case descriptions most associated with Principal Component #1
+
+## ID `r ff[[1]]$get_most_like_idx(1)` Value = `r ff[[1]]$get_most_like_value(1)`
+`r ff[[1]]$get_most_like_text(1)`
+
+## ID `r ff[[1]]$get_most_like_idx(2)`  Value = `r ff[[1]]$get_most_like_value(2)`
+`r ff[[1]]$get_most_like_text(2)`
+
+## ID `r ff[[1]]$get_most_like_idx(3)`  Value = `r ff[[1]]$get_most_like_value(3)`
+`r ff[[1]]$get_most_like_text(3)`
+
+## ID `r ff[[1]]$get_most_like_idx(4)`  Value = `r ff[[1]]$get_most_like_value(4)`
+`r ff[[1]]$get_most_like_text(4)`
+
+## ID `r ff[[1]]$get_most_like_idx(5)`  Value = `r ff[[1]]$get_most_like_value(5)`
+`r ff[[1]]$get_most_like_text(5)`
+
+
+# Business Case descriptions least associated with Principal Component #1
+
+## ID `r ff[[1]]$get_least_like_idx(1)`  Value = `r ff[[1]]$get_least_like_value(1)`
+`r ff[[1]]$get_least_like_text(1)`
+
+## ID `r ff[[1]]$get_least_like_idx(2)`  Value = `r ff[[1]]$get_least_like_value(2)`
+`r ff[[1]]$get_least_like_text(2)`
+
+## ID `r ff[[1]]$get_least_like_idx(3)`  Value = `r ff[[1]]$get_least_like_value(3)`
+`r ff[[1]]$get_least_like_text(3)`
+
+## ID `r ff[[1]]$get_least_like_idx(4)`  Value = `r ff[[1]]$get_least_like_value(4)`
+`r ff[[1]]$get_least_like_text(4)`
+
+## ID `r ff[[1]]$get_least_like_idx(5)`  Value = `r ff[[1]]$get_least_like_value(5)`
+`r ff[[1]]$get_least_like_text(5)`
+
+
+# Business Case descriptions most associated with Principal Component #2
+
+## ID `r ff[[2]]$get_most_like_idx(1)` Value = `r ff[[2]]$get_most_like_value(1)`
+`r ff[[2]]$get_most_like_text(1)`
+
+## ID `r ff[[2]]$get_most_like_idx(2)`  Value = `r ff[[2]]$get_most_like_value(2)`
+`r ff[[2]]$get_most_like_text(2)`
+
+## ID `r ff[[2]]$get_most_like_idx(3)`  Value = `r ff[[2]]$get_most_like_value(3)`
+`r ff[[2]]$get_most_like_text(3)`
+
+## ID `r ff[[2]]$get_most_like_idx(4)`  Value = `r ff[[2]]$get_most_like_value(4)`
+`r ff[[2]]$get_most_like_text(4)`
+
+## ID `r ff[[2]]$get_most_like_idx(5)`  Value = `r ff[[2]]$get_most_like_value(5)`
+`r ff[[2]]$get_most_like_text(5)`
+
+
+# Business Case descriptions least associated with Principal Component #2
+
+## ID `r ff[[2]]$get_least_like_idx(1)`  Value = `r ff[[2]]$get_least_like_value(1)`
+`r ff[[2]]$get_least_like_text(1)`
+
+## ID `r ff[[2]]$get_least_like_idx(2)`  Value = `r ff[[2]]$get_least_like_value(2)`
+`r ff[[2]]$get_least_like_text(2)`
+
+## ID `r ff[[2]]$get_least_like_idx(3)`  Value = `r ff[[2]]$get_least_like_value(3)`
+`r ff[[2]]$get_least_like_text(3)`
+
+## ID `r ff[[2]]$get_least_like_idx(4)`  Value = `r ff[[2]]$get_least_like_value(4)`
+`r ff[[2]]$get_least_like_text(4)`
+
+## ID `r ff[[2]]$get_least_like_idx(5)`  Value = `r ff[[2]]$get_least_like_value(5)`
+`r ff[[2]]$get_least_like_text(5)`
+
+
+
+# Business Case descriptions most associated with Principal Component #18
+
+## ID `r ff[[18]]$get_most_like_idx(1)` Value = `r ff[[18]]$get_most_like_value(1)`
+`r ff[[18]]$get_most_like_text(1)`
+
+## ID `r ff[[18]]$get_most_like_idx(2)`  Value = `r ff[[18]]$get_most_like_value(2)`
+`r ff[[18]]$get_most_like_text(2)`
+
+## ID `r ff[[18]]$get_most_like_idx(3)`  Value = `r ff[[18]]$get_most_like_value(3)`
+`r ff[[18]]$get_most_like_text(3)`
+
+## ID `r ff[[18]]$get_most_like_idx(4)`  Value = `r ff[[18]]$get_most_like_value(4)`
+`r ff[[18]]$get_most_like_text(4)`
+
+## ID `r ff[[18]]$get_most_like_idx(5)`  Value = `r ff[[18]]$get_most_like_value(5)`
+`r ff[[18]]$get_most_like_text(5)`
+
+
+# Business Case descriptions least associated with Principal Component #18
+
+## ID `r ff[[18]]$get_least_like_idx(1)`  Value = `r ff[[18]]$get_least_like_value(1)`
+`r ff[[18]]$get_least_like_text(1)`
+
+## ID `r ff[[18]]$get_least_like_idx(2)`  Value = `r ff[[18]]$get_least_like_value(2)`
+`r ff[[18]]$get_least_like_text(2)`
+
+## ID `r ff[[18]]$get_least_like_idx(3)`  Value = `r ff[[18]]$get_least_like_value(3)`
+`r ff[[18]]$get_least_like_text(3)`
+
+## ID `r ff[[18]]$get_least_like_idx(4)`  Value = `r ff[[18]]$get_least_like_value(4)`
+`r ff[[18]]$get_least_like_text(4)`
+
+## ID `r ff[[18]]$get_least_like_idx(5)`  Value = `r ff[[18]]$get_least_like_value(5)`
+`r ff[[18]]$get_least_like_text(5)`
+
+
+
+
+```{r}
+
+
+the_categories <- rep(1, nrow(business_cases_year_17))
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Yellow"] <- 2
+the_categories[ business_cases_year_17$CIO_Evaluation_Color=="Red"] <- 2
+
+
+p1 <- p0$my_projection_matrix[,1:3] %>% cbind(the_categories)
+# p1 %>% head()
+
+# (p1$idx - p1$uui) %>% min()
+
+plot(p1$pcx_2~p1$pcx_1, col=p1$the_categories)
+
+```
+
+
+
+```{r}
+
+some_nice_pcx <- c(1,2,4,5, 9, 11, 18, 25, 33, 40, 48, 58, 60, 73, 76, 79, 95, 96, 97, 115, 116, 118)
+p2 <- p0$my_projection_matrix[,(some_nice_pcx+1)] %>% cbind(the_categories)
+
+p2$the_categories <- p2$the_categories  - 1 
+
+hm <- glm(the_categories~., data=p2, family=binomial)
+
+summary(hm)
+
+```
+
+
+
+
+
+
+  test_model <- function(the_formula, the_data, the_proportion) {
+    result <- new.env(emptyenv())
+    
+    n <- the_data %>% nrow()
+    
+    result$tr <- sample(1:n, floor(the_proportion*n) )
+    result$train <- the_data[result$tr,]
+    result$test <- the_data[-result$tr,]
+    
+    result$hm <- glm(the_formula, data=result$train, family=binomial)
+    
+    result$pred <- predict(result$hm, result$test)
+    result$test <- result$test %>% cbind( result$pred ) 
+      
+    # result$table <- table(pred=predict(result$hm, test)$class, true=the_data$the_categories[-tr])
+    # rresult$roc <- some_table_information(rresult$table)
+    result
+  }
+
+t0 <- test_model(the_categories~., p2, 0.9)
+t1 <- t0$test[,24:25]
+colnames(t1) <- c("cat", "pred")
+
+
+happy <- t1[t1$cat==0, "pred"]
+sad <- t1[t1$cat==1, "pred"]
+
+boxplot(pred~cat, data=t1)
+
+happy %>% summary()
+sad %>% summary()
+
+
+
+
+
+  
+  
+t0 <- test_model(the_categories~., p2, 0.9)
+t0$hm %>% summary()
+t0$pred
+t0$test
+
+boxplot(t0$pred~t0$test$the_categories)
+
+# given pred, I should be able to get an ROC
+
+monday <- function(pred, test, cutoff) {
+  
+  r0 <- predict(pred, test) 
+  r1 <- r0 < cutoff
+  r1
+}
+
+monday(t0$hm, t0$test, .5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+p0$my_principal_component_matrix %>% summary()
+
+
+
+
+
+
+
+
+
+
