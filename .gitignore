@@ -25,4 +25,7 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 .Rproj.user
+<<<<<<< HEAD
+=======
 .~lock.princ_comp.csv#
+>>>>>>> bc8e62c15435169d6bdcd0989a168d30b98b73dd
